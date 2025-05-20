@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: blog_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: secretpassword    # Root user password
+      MYSQL_DATABASE: blog_db                 # Initial database
+      MYSQL_USER: bloguser                    # Non-root user (optional)
+      MYSQL_PASSWORD: blogpassword          # Password for non-root user
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  php:
+    build: ./docker/php
+    container_name: blog_php
+    volumes:
+      - ./src:/var/www/html
+    environment:
+      DB_HOST: mysql
+      DB_NAME: blog_db
+      DB_USER: bloguser
+      DB_PASSWORD: blogpassword
+    depends_on:
+      - mysql
+
+  nginx:
+    image: nginx:alpine
+    container_name: blog_nginx
+    ports:
+      - "4853:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+volumes:
+  mysql_data:
