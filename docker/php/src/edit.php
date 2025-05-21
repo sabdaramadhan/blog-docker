@@ -1,5 +1,5 @@
 <?php
-// create.php
+// edit.php
 
 // Database connection settings
 $host = 'mysql';
@@ -14,15 +14,29 @@ $options = [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ];
 
+try {
+    $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (PDOException $e) {
+    die("Database connection failed: " . htmlspecialchars($e->getMessage()));
+}
+
+// Get post ID from GET parameter
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+    die("Invalid post ID.");
+}
+$id = (int)$_GET['id'];
+
+// Initialize variables
 $title = '';
 $content = '';
 $errors = [];
 
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
     $content = trim($_POST['content'] ?? '');
 
-    // Validate inputs
+    // Validate
     if ($title === '') {
         $errors[] = "Title is required.";
     }
@@ -31,20 +45,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        try {
-            $pdo = new PDO($dsn, $user, $pass, $options);
+        // Update the post
+        $stmt = $pdo->prepare("UPDATE posts SET title = ?, content = ? WHERE id = ?");
+        $stmt->execute([$title, $content, $id]);
 
-            $stmt = $pdo->prepare("INSERT INTO posts (title, content, created_at) VALUES (?, ?, NOW())");
-            $stmt->execute([$title, $content]);
-
-            // Redirect to index.php after successful insert
-            header("Location: index.php");
-            exit;
-
-        } catch (PDOException $e) {
-            $errors[] = "Database error: " . htmlspecialchars($e->getMessage());
-        }
+        // Redirect back to index.php
+        header("Location: index.php");
+        exit;
     }
+} else {
+    // Load existing post data for the form
+    $stmt = $pdo->prepare("SELECT title, content FROM posts WHERE id = ?");
+    $stmt->execute([$id]);
+    $post = $stmt->fetch();
+
+    if (!$post) {
+        die("Post not found.");
+    }
+
+    $title = $post['title'];
+    $content = $post['content'];
 }
 ?>
 
@@ -53,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Create New Post</title>
+  <title>Edit Post</title>
 
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -61,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
 <div class="container mt-5">
-  <h1 class="mb-4">Create New Post</h1>
+  <h1 class="mb-4">Edit Post</h1>
 
   <?php if ($errors): ?>
     <div class="alert alert-danger">
@@ -73,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   <?php endif; ?>
 
-  <form method="post" action="create.php" novalidate>
+  <form method="post" action="edit.php?id=<?= $id ?>" novalidate>
     <div class="mb-3">
       <label for="title" class="form-label">Title</label>
       <input 
@@ -97,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ><?= htmlspecialchars($content) ?></textarea>
     </div>
 
-    <button type="submit" class="btn btn-primary">Create Post</button>
+    <button type="submit" class="btn btn-primary">Update Post</button>
     <a href="index.php" class="btn btn-secondary ms-2">Cancel</a>
   </form>
 </div>
